@@ -52,17 +52,10 @@ pipeline {
       stage ('Checkout') {
             steps {
                 dir("${WORKSPACE}/code") {
-                    checkout([
-                        $class: 'GitSCM',
-                        branches: [[name: '*/$RELEASE-1.0']],
-                        doGenerateSubmoduleConfigurations: false,
-                        extensions: [[$class: 'LocalBranch']],
-                        submoduleCfg: [],
-                        userRemoteConfigs: [[
-                        url: 'https://github.com/DEL-ORG/a1angel-pub.git',
-                        credentialsId: 'jenkins-github-key'
-                        ]]
-                    ])
+                    checkout scmGit(branches: [[name: '*/RELEASE-1.0']],
+                    extensions: [], 
+                    userRemoteConfigs: [[credentialsId: 'jenkins-github-key', 
+                    url: 'git@github.com:DEL-ORG/a1angel-pub.git']])          
                 }
             }
         }
