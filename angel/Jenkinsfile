@@ -223,7 +223,6 @@ pipeline {
           expression {
             params.Registry_Name == 'DockerHub_Registry' }
           }
-        }
 	      steps {
 	        script {
 	          withCredentials([
@@ -316,6 +315,7 @@ pipeline {
 	        }
 
 	      }
+    }
     stage('Generate ecr docker-compose file') {
             when {
           expression {
