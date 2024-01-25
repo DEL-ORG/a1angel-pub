@@ -67,9 +67,9 @@ pipeline {
             }
             }
             steps {
-              dir("${WORKSPACE}/code")
+              //dir("${WORKSPACE}/code")
             sh '''
-               cd angel/code/auth/src/main
+               cd ${WORKSPACE}/code/angel/code/auth/src/main
                go build 
                cd -
                ls -la
