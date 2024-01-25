@@ -31,8 +31,12 @@ pipeline {
                 script {
                     properties([
                         parameters([
-                          string(name: 'AWS_ACCOUNT_NUMBER', defaultValue: '786809365423', description: 'your aws account id')
-                          string(name: 'AWS_REGION', defaultValue: 'us-east-1', description: 'the region for your registry')                          
+                          string(name: 'AWS_ACCOUNT_NUMBER', 
+                            defaultValue: '786809365423', 
+                            description: 'your aws account id'),
+                          string(name: 'AWS_REGION',
+                            defaultValue: 'us-east-1', 
+                            description: 'the region for your registry')                          
                         ])
                     ])
                 }
