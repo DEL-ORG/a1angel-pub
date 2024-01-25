@@ -223,7 +223,7 @@ pipeline {
           expression {
             params.Registry_Name == 'DockerHub_Registry' }
           }
-            }
+        }
 	      steps {
 	        script {
 	          withCredentials([
