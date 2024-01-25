@@ -41,7 +41,7 @@ pipeline {
                 dir("${WORKSPACE}/code") {
                     checkout([
                         $class: 'GitSCM',
-                        branches: [[name: '*/$BRANCH']],
+                        branches: [[name: '*/$RELEASE-1.0']],
                         doGenerateSubmoduleConfigurations: false,
                         extensions: [[$class: 'LocalBranch']],
                         submoduleCfg: [],
