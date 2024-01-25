@@ -59,23 +59,23 @@ pipeline {
                 }
             }
         }
-      //stage('test auth') {
-      //      agent {
-      //       docker {
-      //         image 'golang:alpine'
-      //         args '-u root:root'
-      //      }
-      //      }
-      //    steps {
-      //      dir("${WORKSPACE}/code")
-      //      sh '''
-      //         cd angel/code/auth/src/main
-      //         go build 
-      //         cd -
-      //         ls -la
-      //      '''
-      //      }
-      //}
+      stage('test auth') {
+            agent {
+             docker {
+               image 'golang:alpine'
+               args '-u root:root'
+            }
+            }
+          steps {
+            dir("${WORKSPACE}/code")
+            sh '''
+               cd a1angel/angel/code/auth/src/main
+               go build 
+               cd -
+               ls -la
+            '''
+            }
+      }
       stage('test ui') {
           agent {
              docker {
