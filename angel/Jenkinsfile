@@ -14,7 +14,6 @@ pipeline {
            choice(
                   choices: ['DockerHub_Registry', 'Amazon_ECR_Registry'],
                   name: 'Registry_Name' 
-                  description: 'Choose your container registry'
            )
            when {
             expression {
