@@ -1,0 +1,462 @@
+pipeline {
+    agent any
+    triggers {
+        githubPush()
+    }
+    options {
+           buildDiscarder(logRotator(numToKeepStr: '10'))
+           skipDefaultCheckout(true)
+           disableConcurrentBuilds()
+           timeout (time: 60, unit: 'MINUTES')
+           timestamps()
+    }
+    parameters{      
+           choice(
+                  name: 'Registry_Name'
+                  choices: ['DockerHub_Registry', 'Amazon_ECR_Registry'], 
+                  description: 'Choose your container registry'
+           ),
+           when {
+            expression {
+            params.Registry_Name == 'Amazon_ECR_Registry' 
+            }
+           string(name: 'AWS_ACCOUNT_NUMBER', defaultValue: '786809365423', description: 'your aws account id')
+           string(name: 'AWS_REGION', defaultValue: 'us-east-1', description: 'the region for your registry')
+           }
+    }
+    environment {
+        DockerHub_Registry_Name = "devopseasylearning"
+        ECR_REPOSITORY_URI = "${params.AWS_ACCOUNT_NUMBER}.dkr.ecr.${params.AWS_REGION}.amazonaws.com"
+    }
+    stages {
+      stage ('Sanity Check') {
+            steps {
+                script {
+                   sanityChecks()
+                }
+            }
+      }
+      stage ('Checkout') {
+            steps {
+                dir("${WORKSPACE}/code") {
+                    checkout([
+                        $class: 'GitSCM',
+                        branches: [[name: '*/$BRANCH']],
+                        doGenerateSubmoduleConfigurations: false,
+                        extensions: [[$class: 'LocalBranch']],
+                        submoduleCfg: [],
+                        userRemoteConfigs: [[
+                        url: 'git@github.com:DEL-ORG/a1angel-pub.git',
+                        credentialsId: 'jenkins-github-key'
+                        ]]
+                    ])
+                }
+            }
+        }
+      stage('test auth') {
+            agent {
+             docker {
+               image 'golang:alpine'
+               args '-u root:root'
+            }
+            }
+            steps {
+              dir("${WORKSPACE}/code")
+            sh '''
+               cd angel/code/auth/src/main
+               go build 
+               cd -
+               ls -la
+            '''
+            }
+      }
+      stage('test ui') {
+          agent {
+             docker {
+               image 'node:17'
+               args '-u root:root'
+            }
+          }
+            steps {
+              dir("${WORKSPACE}/code")
+                sh '''
+                 cd angel/code/ui
+                 npm run
+                '''
+            }
+      }
+      stage('test weather') {
+            agent {
+             docker {
+               image 'python:3.8-slim-buster'
+               args '-u root:root'
+            }
+            }
+            steps {
+                dir("${WORKSPACE}/code")
+                sh '''
+                cd angel/code/weather
+                pip3 install -r requirements.txt
+                '''
+            }
+      }
+      stage('SonarQube analysis') {
+            agent {
+                docker {
+                  image 'sonarsource/sonar-scanner-cli:4.7.0'
+                }
+               }
+               environment {
+         CI = 'true'
+         scannerHome='/opt/sonar-scanner'
+    }
+            steps{
+                withSonarQubeEnv('sonar') {
+                    sh "${scannerHome}/bin/sonar-scanner"
+                }
+            }
+      }
+      stage("Quality Gate") {
+            steps {
+              timeout(time: 1, unit: 'HOURS') {
+                waitForQualityGate abortPipeline: true
+              }
+            }
+      }
+      stage('Build Auth') {
+            steps {
+              dir("${WORKSPACE}/code/angel/code/auth")
+                sh '''
+                docker build -t ${env.DockerHub_Registry_Name}/a1angel-weatherapp-auth:${BUILD_NUMBER} .
+                docker build -t ${env.ECR_REPOSITORY_URI}/a1angel-weatherapp-auth:${BUILD_NUMBER} .
+                '''
+            }
+      }
+      stage('Build UI') {
+            steps {
+              dir("${WORKSPACE}/code/angel/code/ui")
+                sh '''
+                docker build -t ${env.DockerHub_Registry_Name}/a1angel-weatherapp-ui:${BUILD_NUMBER} .
+                docker build -t ${env.ECR_REPOSITORY_URI}/a1angel-weatherapp-ui:${BUILD_NUMBER} .
+                '''
+            }
+      }
+      stage('Build weather') {
+            steps {
+              dir("${WORKSPACE}/code/angel/code/weather")
+                sh '''
+                docker build -t ${env.DockerHub_Registry_Name}/a1angel-weatherapp-weather:${BUILD_NUMBER} .
+                docker build -t ${env.ECR_REPOSITORY_URI}/a1angel-weatherapp-weather:${BUILD_NUMBER} .
+                '''
+            }
+      }
+      stage('Build redis') {
+            steps {
+              dir("${WORKSPACE}/code/angel/code/redis")
+                sh '''
+                docker build -t ${env.DockerHub_Registry_Name}/a1angel-weatherapp-redis:${BUILD_NUMBER} .
+                docker build -t ${env.ECR_REPOSITORY_URI}/a1angel-weatherapp-redis:${BUILD_NUMBER} .
+                '''
+            }
+      }
+      stage('Build db') {
+            steps {
+              dir("${WORKSPACE}/code/angel/code/db")
+                sh '''
+                docker build -t ${env.DockerHub_Registry_Name}/a1angel-weatherapp-db:${BUILD_NUMBER} .
+                docker build -t ${env.ECR_REPOSITORY_URI}/a1angel-weatherapp-db:${BUILD_NUMBER} .                '''
+            }
+      }
+      stage('Login-DockerHub_Registry-push-images') {
+        when { 
+          expression {
+            params.Registry_Name == 'DockerHub_Registry' }
+            }
+            environment {
+		        DOCKERHUB_Registry_CREDENTIALS=credentials('dockerhub_Registry-cred')
+	        }
+			  steps {
+				   sh '''
+           echo $DOCKERHUB_Registry_CREDENTIALS_PSW | docker login -u $DOCKERHUB_Registry_CREDENTIALS_USR --password-stdin
+           docker push devopseasylearning/a1angel-weatherapp-auth:${BUILD_NUMBER}
+           docker push devopseasylearning/a1angel-weatherapp-ui:${BUILD_NUMBER}
+           docker push devopseasylearning/a1angel-weatherapp-weather:${BUILD_NUMBER}
+           docker push devopseasylearning/a1angel-weatherapp-redis:${BUILD_NUMBER}
+           docker push devopseasylearning/a1angel-weatherapp-db:${BUILD_NUMBER}
+          '''
+			}
+		}
+    stage('Login-ECR-push-images') {
+        when{ 
+          expression {
+            params.Registry_Name == 'Amazon_ECR_Registry' }
+            }
+            environment {
+		        ECR_Registry_CREDENTIALS=credentials('aws-cred')
+	        }
+            steps {
+                sh '''
+            aws ecr get-login-password --region ${params.AWS_REGION} | sudo docker login --username AWS --password-stdin ${ECR_REPOSITORY_URI}
+            docker push 786809365423.dkr.ecr.us-east-1.amazon_ws._Registrycom/a1angel-weatherapp-redis:${BUILD_NUMBER}
+            docker push 786809365423.dkr.ecr.us-east-1.amazon_ws._Registrycom/a1angel-weatherapp-db:${BUILD_NUMBER}
+            docker push 786809365423.dkr.ecr.us-east-1.amazon_ws._Registrycom/a1angel-weatherapp-auth:${BUILD_NUMBER}
+            docker push 786809365423.dkr.ecr.us-east-1.amazon_ws._Registrycom/a1angel-weatherapp-ui:${BUILD_NUMBER}
+            docker push 786809365423.dkr.ecr.us-east-1.amazon_ws._Registrycom/a1angel-weatherapp-weather:${BUILD_NUMBER}
+                '''
+            }
+    }
+    stage('Generate docker-compose file with dockerhub') { 
+          when {
+          expression {
+            params.Registry_Name == 'DockerHub_Registry' }
+          }
+            }
+	      steps {
+	        script {
+	          withCredentials([
+	            string(credentialsId: 'weatherapp-MYSQL_ROOT_PASSWORD', variable: 'weatherapp-MYSQL_ROOT_PASSWORD'),
+	            string(credentialsId: 'weatherapp-REDIS_PASSWORD', variable: 'weatherapp-REDIS_PASSWORD'),
+              string(credentialsId: 'weather-DB_PASSWORD', variable: 'weather-DB_PASSWORD'),
+	            string(credentialsId: 'weatherapp-APIKEY', variable: 'weatherapp-APIKEY')
+	          ]) {
+	            sh '''
+                cat <<EOF> docker-compose.yml
+  version: '3.5'
+  services:
+    db:
+      container_name: weatherapp-db
+      image: devopseasylearning/a1angel-weatherapp-db:${BUILD_NUMBER}
+      environment:
+        MYSQL_ROOT_PASSWORD: ${weatherapp-MYSQL_ROOT_PASSWORD}
+      volumes:
+        - db-data:/var/lib/mysql
+      networks:   
+        - weatherapp
+      restart: always
+  
+    redis:
+      container_name: weatherapp-redis
+      image: devopseasylearning/a1angel-weatherapp-redis:${BUILD_NUMBER}
+      networks:
+        - weatherapp
+      environment:
+        REDIS_USER: redis
+        REDIS_PASSWORD: ${weatherapp-REDIS_PASSWORD}
+      volumes:
+        - redis-data:/data
+      restart: always
+  
+    weather:
+      container_name: weatherapp-weather
+      image: devopseasylearning/a1angel-weatherapp-weather:${BUILD_NUMBER}
+      expose:
+        - 5000
+      environment:
+        APIKEY: ${weatherapp-APIKEY}
+      restart: always
+      depends_on:
+        - db
+        - redis  # Weather depends on both db and redis
+    auth:
+      container_name: weatherapp-auth
+      image: devopseasylearning/a1angel-weatherapp-auth:${BUILD_NUMBER}
+      environment:
+        DB_HOST: db
+        DB_PASSWORD: ${weather-DB_PASSWORD}
+      expose:
+        - 8080
+      networks:
+        - weatherapp
+      restart: always
+      depends_on:
+        - weather  # Auth depends on the weather service
+  
+    ui:
+      container_name: weatherapp-ui
+      image: devopseasylearning/a1angel-weatherapp-ui:${BUILD_NUMBER}
+      environment:
+       AUTH_HOST: auth
+       AUTH_PORT: 8080
+       WEATHER_HOST: weather
+       WEATHER_PORT: 5000
+       REDIS_USER: redis
+       REDIS_PASSWORD: ${weatherapp-REDIS_PASSWORD}
+      expose:
+        - 3000
+      ports:
+        - 3000:3000
+      networks:
+        - weatherapp
+      restart: always
+      depends_on:
+        - auth  # UI depends on Auth
+    networks:
+     weatherapp:
+  
+    volumes:
+     db-data:
+     redis-data:
+  EOF
+	            '''
+	          }
+
+	        }
+
+	      }
+    stage('Generate ecr docker-compose file') {
+            when {
+          expression {
+            params.Registry_Name == 'Amazon_ECR_Registry' }
+          }
+	      steps {
+	        script {
+	          withCredentials([
+	            string(credentialsId: 'weatherapp-MYSQL_ROOT_PASSWORD', variable: 'weatherapp-MYSQL_ROOT_PASSWORD'),
+	            string(credentialsId: 'weatherapp-REDIS_PASSWORD', variable: 'weatherapp-REDIS_PASSWORD'),
+              string(credentialsId: 'weather-DB_PASSWORD', variable: 'weather-DB_PASSWORD'),
+	            string(credentialsId: 'weatherapp-APIKEY', variable: 'weatherapp-APIKEY')
+	          ]) {
+	            sh '''
+                cat <<EOF> docker-compose.yml
+  version: '3.5'
+  services:
+    db:
+      container_name: weatherapp-db
+      image: 786809365423.dkr.ecr.us-east-1.amazon_ws._Registrycom/a1angel-weatherapp-db:${BUILD_NUMBER}
+      environment:
+        MYSQL_ROOT_PASSWORD: ${weatherapp-MYSQL_ROOT_PASSWORD}
+      volumes:
+        - db-data:/var/lib/mysql
+      networks:   
+        - weatherapp
+      restart: always
+  
+    redis:
+      container_name: weatherapp-redis
+      image: 786809365423.dkr.ecr.us-east-1.amazon_ws._Registrycom/a1angel-weatherapp-redis:${BUILD_NUMBER}
+      networks:
+        - weatherapp
+      environment:
+        REDIS_USER: redis
+        REDIS_PASSWORD: ${weatherapp-REDIS_PASSWORD}
+      volumes:
+        - redis-data:/data
+      restart: always
+  
+    weather:
+      container_name: weatherapp-weather
+      image: 786809365423.dkr.ecr.us-east-1.amazon_ws._Registrycom/a1angel-weatherapp-weather:${BUILD_NUMBER}
+      expose:
+        - 5000
+      environment:
+        APIKEY: ${weatherapp-APIKEY}
+      restart: always
+      depends_on:
+        - db
+        - redis  # Weather depends on both db and redis
+    auth:
+      container_name: weatherapp-auth
+      image: 786809365423.dkr.ecr.us-east-1.amazon_ws._Registrycom/a1angel-weatherapp-auth:${BUILD_NUMBER}
+      environment:
+        DB_HOST: db
+        DB_PASSWORD: ${weather-DB_PASSWORD}
+      expose:
+        - 8080
+      networks:
+        - weatherapp
+      restart: always
+      depends_on:
+        - weather  # Auth depends on the weather service
+  
+    ui:
+      container_name: weatherapp-ui
+      image: 786809365423.dkr.ecr.us-east-1.amazon_ws._Registrycom/a1angel-weatherapp-ui:${BUILD_NUMBER}
+      environment:
+       AUTH_HOST: auth
+       AUTH_PORT: 8080
+       WEATHER_HOST: weather
+       WEATHER_PORT: 5000
+       REDIS_USER: redis
+       REDIS_PASSWORD: ${weatherapp-REDIS_PASSWORD}
+      expose:
+        - 3000
+      ports:
+        - 3000:3000
+      networks:
+        - weatherapp
+      restart: always
+      depends_on:
+        - auth  # UI depends on Auth
+    networks:
+     weatherapp:
+  
+    volumes:
+     db-data:
+     redis-data:
+  EOF
+	            '''
+	      }
+
+	    }
+
+	  }
+  }
+    stage('Deploy') {
+            steps {
+                sh '''
+                cat docker-compose.yml
+                docker-compose down --remove-orphans || true
+                docker stop $(docker ps -q) && docker rm $(docker ps -aq)
+                docker-compose up -d
+                docker-compose ps
+                '''
+            }
+        }
+  }
+ post {
+       always {
+        success {
+            slackSend color: '#2EB67D',
+            channel: 'development-alerts', 
+            message: "*Weatherapp Project Build Status*" +
+            "\n Project Name: Weatherapp" +
+            "\n Job Name: ${env.JOB_NAME}" +
+            "\n Build number: ${currentBuild.displayName}" +
+            "\n Build Status : *SUCCESS*" +
+            "\n Build url : ${env.BUILD_URL}"
+        }
+        failure {
+            slackSend color: '#E01E5A',
+            channel: 'development-alerts',  
+            message: "*Weatherapp Project Build Status*" +
+            "\n Project Name: Weatherapp" +
+            "\n Job Name: ${env.JOB_NAME}" +
+            "\n Build number: ${currentBuild.displayName}" +
+            "\n Build Status : *FAILED*" +
+            "\n Build User : *Angel*" +
+            "\n Action : Please check the console output to fix this job IMMEDIATELY" +
+            "\n Build url : ${env.BUILD_URL}"
+        }
+        unstable {
+            slackSend color: '#ECB22E',
+            channel: 'development-alerts', 
+            message: "*Weatherapp Project Build Status*" +
+            "\n Project Name: Weatherapp" +
+            "\n Job Name: ${env.JOB_NAME}" +
+            "\n Build number: ${currentBuild.displayName}" +
+            "\n Build Status : *UNSTABLE*" +
+            "\n Action : Please check the console output to fix this job IMMEDIATELY" +
+            "\n Build url : ${env.BUILD_URL}"
+        }   
+    }
+ }
+}
+
+def sanityChecks() {
+    if (params.Registry_Name.isEmpty()) {
+        println('Parameter Registry_Name is not set')
+        sh """
+            exit 2
+        """
+    }
+}
