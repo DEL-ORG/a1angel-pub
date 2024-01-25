@@ -59,7 +59,7 @@ pipeline {
                         extensions: [[$class: 'LocalBranch']],
                         submoduleCfg: [],
                         userRemoteConfigs: [[
-                        url: 'git@github.com:DEL-ORG/a1angel-pub.git',
+                        url: 'https://github.com/DEL-ORG/a1angel-pub.git',
                         credentialsId: 'jenkins-github-key'
                         ]]
                     ])
