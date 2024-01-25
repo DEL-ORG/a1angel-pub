@@ -11,11 +11,11 @@ pipeline {
            timestamps()
     }
     parameters{      
-           choice([
+           choice(
                   name: 'Registry_Name'
                   choices: ['DockerHub_Registry', 'Amazon_ECR_Registry'], 
                   description: 'Choose your container registry'
-           ]),
+           )
            when {
             expression {
             params.Registry_Name == 'Amazon_ECR_Registry' 
