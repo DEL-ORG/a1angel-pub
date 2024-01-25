@@ -15,19 +15,29 @@ pipeline {
                   choices: ['DockerHub_Registry', 'Amazon_ECR_Registry'],
                   name: 'Registry_Name' 
            )
-           when {
-            expression {
-            params.Registry_Name == 'Amazon_ECR_Registry' 
-            }
-           string(name: 'AWS_ACCOUNT_NUMBER', defaultValue: '786809365423', description: 'your aws account id')
-           string(name: 'AWS_REGION', defaultValue: 'us-east-1', description: 'the region for your registry')
-           }
     }
     environment {
         DockerHub_Registry_Name = "devopseasylearning"
         ECR_REPOSITORY_URI = "${params.AWS_ACCOUNT_NUMBER}.dkr.ecr.${params.AWS_REGION}.amazonaws.com"
     }
     stages {
+      stage('Setup parameters') {
+          when {
+            expression {
+            params.Registry_Name == 'Amazon_ECR_Registry' 
+            }
+          }
+            steps {
+                script {
+                    properties([
+                        parameters([
+                      string(name: 'AWS_ACCOUNT_NUMBER', defaultValue: '786809365423', description: 'your aws account id')
+                      string(name: 'AWS_REGION', defaultValue: 'us-east-1', description: 'the region for your registry')                          
+                        ])
+                    ])
+                }
+            }
+        }
       stage ('Sanity Check') {
             steps {
                 script {
