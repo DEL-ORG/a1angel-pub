@@ -67,9 +67,8 @@ pipeline {
             }
             }
           steps {
-            dir("${WORKSPACE}/code")
             sh '''
-               cd a1angel/angel/code/auth/src/main
+               cd code/a1angel/angel/code/auth/src/main
                go build 
                cd -
                ls -la
@@ -84,9 +83,9 @@ pipeline {
             }
           }
             steps {
-              dir("${WORKSPACE}/code")
+              //dir("${WORKSPACE}/code")
                 sh '''
-                 cd angel/code/ui
+                 cd cd code/a1angel/angel/code/ui
                  npm run
                 '''
             }
@@ -99,9 +98,9 @@ pipeline {
             }
             }
             steps {
-                dir("${WORKSPACE}/code")
+                //dir("${WORKSPACE}/code")
                 sh '''
-                cd angel/code/weather
+                cd cd code/a1angel/angel/code/weather
                 pip3 install -r requirements.txt
                 '''
             }
