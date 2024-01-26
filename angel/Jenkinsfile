@@ -66,8 +66,7 @@ pipeline {
             }
           steps {
             sh '''
-               cd ${WORKSPACE}/angel/code/auth/src/main
-               pwd
+               cd angel/auth/src/main
                go build 
                cd -
                ls -la
