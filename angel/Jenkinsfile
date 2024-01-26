@@ -51,12 +51,10 @@ pipeline {
       }
       stage ('Checkout') {
             steps {
-                     {
                     checkout scmGit(branches: [[name: '*/RELEASE-1.0']],
                     extensions: [], 
                     userRemoteConfigs: [[credentialsId: 'jenkins-github-key', 
                     url: 'git@github.com:DEL-ORG/a1angel-pub.git']])          
-                }
             }
         }
       stage('test auth') {
