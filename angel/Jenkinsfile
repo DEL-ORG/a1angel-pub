@@ -50,6 +50,7 @@ pipeline {
             }
       }
       stage ('Checkout') {
+             dir("${WORKSPACE}/code")
             steps {
                     checkout scmGit(branches: [[name: '*/RELEASE-1.0']],
                     extensions: [], 
@@ -65,6 +66,7 @@ pipeline {
             }
             }
           steps {
+            dir("${WORKSPACE}/code/auth/src/main")
             sh '''
                cd angel/auth/src/main
                go build 
@@ -81,6 +83,7 @@ pipeline {
             }
           }
             steps {
+              dir("${WORKSPACE}/code/ui")
                 sh '''
                  cd angel/code/ui
                  npm run
@@ -95,6 +98,7 @@ pipeline {
             }
             }
             steps {
+              dir("${WORKSPACE}/code/weather")
                 sh '''
                 cd angel/code/weather
                 pip3 install -r requirements.txt
