@@ -51,7 +51,7 @@ pipeline {
       }
       stage ('Checkout') {
             steps {
-                dir("${WORKSPACE}/code") {
+                     {
                     checkout scmGit(branches: [[name: '*/RELEASE-1.0']],
                     extensions: [], 
                     userRemoteConfigs: [[credentialsId: 'jenkins-github-key', 
@@ -68,7 +68,7 @@ pipeline {
             }
           steps {
             sh '''
-               cd code/a1angel/angel/code/auth/src/main
+               cd angel/code/auth/src/main
                go build 
                cd -
                ls -la
@@ -83,9 +83,8 @@ pipeline {
             }
           }
             steps {
-              //dir("${WORKSPACE}/code")
                 sh '''
-                 cd cd code/a1angel/angel/code/ui
+                 cd angel/code/ui
                  npm run
                 '''
             }
@@ -98,9 +97,8 @@ pipeline {
             }
             }
             steps {
-                //dir("${WORKSPACE}/code")
                 sh '''
-                cd cd code/a1angel/angel/code/weather
+                cd angel/code/weather
                 pip3 install -r requirements.txt
                 '''
             }
@@ -130,7 +128,7 @@ pipeline {
       }
       stage('Build Auth') {
             steps {
-              dir("${WORKSPACE}/code/angel/code/auth")
+              dir("${WORKSPACE}/angel/code/auth")
                 sh '''
                 docker build -t ${env.DockerHub_Registry_Name}/a1angel-weatherapp-auth:${BUILD_NUMBER} .
                 docker build -t ${env.ECR_REPOSITORY_URI}/a1angel-weatherapp-auth:${BUILD_NUMBER} .
@@ -139,7 +137,7 @@ pipeline {
       }
       stage('Build UI') {
             steps {
-              dir("${WORKSPACE}/code/angel/code/ui")
+              dir("${WORKSPACE}/angel/code/ui")
                 sh '''
                 docker build -t ${env.DockerHub_Registry_Name}/a1angel-weatherapp-ui:${BUILD_NUMBER} .
                 docker build -t ${env.ECR_REPOSITORY_URI}/a1angel-weatherapp-ui:${BUILD_NUMBER} .
@@ -148,7 +146,7 @@ pipeline {
       }
       stage('Build weather') {
             steps {
-              dir("${WORKSPACE}/code/angel/code/weather")
+              dir("${WORKSPACE}/angel/code/weather")
                 sh '''
                 docker build -t ${env.DockerHub_Registry_Name}/a1angel-weatherapp-weather:${BUILD_NUMBER} .
                 docker build -t ${env.ECR_REPOSITORY_URI}/a1angel-weatherapp-weather:${BUILD_NUMBER} .
@@ -157,7 +155,7 @@ pipeline {
       }
       stage('Build redis') {
             steps {
-              dir("${WORKSPACE}/code/angel/code/redis")
+              dir("${WORKSPACE}/angel/code/redis")
                 sh '''
                 docker build -t ${env.DockerHub_Registry_Name}/a1angel-weatherapp-redis:${BUILD_NUMBER} .
                 docker build -t ${env.ECR_REPOSITORY_URI}/a1angel-weatherapp-redis:${BUILD_NUMBER} .
@@ -166,7 +164,7 @@ pipeline {
       }
       stage('Build db') {
             steps {
-              dir("${WORKSPACE}/code/angel/code/db")
+              dir("${WORKSPACE}/angel/code/db")
                 sh '''
                 docker build -t ${env.DockerHub_Registry_Name}/a1angel-weatherapp-db:${BUILD_NUMBER} .
                 docker build -t ${env.ECR_REPOSITORY_URI}/a1angel-weatherapp-db:${BUILD_NUMBER} .                '''
