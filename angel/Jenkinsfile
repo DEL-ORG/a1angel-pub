@@ -68,7 +68,6 @@ pipeline {
           steps {
             dir("${WORKSPACE}/code/angel/auth/src/main")
             sh '''
-               cd angel/auth/src/main
                go build 
                cd -
                ls -la
@@ -85,7 +84,6 @@ pipeline {
             steps {
               dir("${WORKSPACE}/code/angel/ui")
                 sh '''
-                 cd angel/code/ui
                  npm run
                 '''
             }
@@ -100,7 +98,6 @@ pipeline {
             steps {
               dir("${WORKSPACE}/code/angel/weather")
                 sh '''
-                cd angel/code/weather
                 pip3 install -r requirements.txt
                 '''
             }
